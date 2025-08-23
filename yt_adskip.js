@@ -1,3 +1,19 @@
+/**
+ * Script to automatically detect and remove YouTube ads and popups such as the "My Ad Center" dialog.
+ * 
+ * Features:
+ * - Detects video ads and attempts to skip or block them automatically.
+ * - Removes popups like the "My Ad Center" dialog by clicking dismiss buttons and removing overlays.
+ * - Automatically resumes video playback if interrupted by ads or popups.
+ * - Adjusts video playback speed and volume to quickly skip ads.
+ * - Removes various on-page ad elements from YouTube UI.
+ * - Logs debug messages if enabled.
+ * 
+ * New addition:
+ * - Retrieves and logs the z-index CSS property of the "My Ad Center" popup dialog (`tp-yt-paper-dialog` element)
+ *   to help debug popup layering issues or confirm if the popup is present and visible.
+ */
+
 (function() {
     const adblocker = true;
     const removePopup = false;
@@ -12,15 +28,27 @@
     if (adblocker) removeAds();
     if (removePopup) popupRemover();
 
+    // Function to get the z-index of the "My Ad Center" popup dialog
+    function getPopupZIndex() {
+        const popup = document.querySelector('tp-yt-paper-dialog[aria-label="My Ad Center"]');
+        if (popup) {
+            // Get computed style of the popup element and extract the z-index value
+            return window.getComputedStyle(popup).zIndex;
+        }
+        return null; // Return null if popup not found
+    }
+
     function popupRemover() {
         setInterval(() => {
             const modalOverlay = document.querySelector("tp-yt-iron-overlay-backdrop");
-            const popup = document.querySelector(".style-scope ytd-enforcement-message-view-model");
+            const popup = document.querySelector("tp-yt-paper-dialog[aria-label='My Ad Center']");
             const popupButton = document.getElementById("dismiss-button");
             var video = document.querySelector('video');
 
+            // Make sure body can scroll again if popup tried to block scrolling
             document.body.style.setProperty('overflow-y', 'auto', 'important');
 
+            // Remove modal overlay if present
             if (modalOverlay) {
                 modalOverlay.removeAttribute("opened");
                 modalOverlay.remove();
@@ -28,13 +56,22 @@
 
             if (popup) {
                 log("Popup detected, removing...");
+
+                // Log the z-index of the popup for debugging purposes
+                const zIndex = getPopupZIndex();
+                log(`Popup z-index is: ${zIndex}`);
+
                 if (popupButton) popupButton.click();
                 popup.remove();
+
+                // Try to resume video playback after removing popup
                 video.play();
                 setTimeout(() => video.play(), 500);
+
                 log("Popup removed");
             }
 
+            // If video is paused for some reason, play it
             if (video && video.paused) video.play();
 
         }, 1000);
@@ -174,6 +211,7 @@
         log("Removed page ads (✔️)");
     }
 
+    // Logging helper function
     function log(message, level = 'l', ...args) {
         if (!debugMessages) return;
 

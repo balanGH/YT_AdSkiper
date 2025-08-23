@@ -10,8 +10,8 @@
  * - Logs debug messages if enabled.
  * 
  * New addition:
- * - Retrieves and logs the z-index CSS property of the "My Ad Center" popup dialog (`tp-yt-paper-dialog` element)
- *   to help debug popup layering issues or confirm if the popup is present and visible.
+ * - Detects the enforcement popup dialog (<tp-yt-paper-dialog>) and sets its z-index to -2204,
+ *   pushing it behind everything to hide it visually.
  */
 
 (function() {
@@ -36,6 +36,21 @@
             return window.getComputedStyle(popup).zIndex;
         }
         return null; // Return null if popup not found
+    }
+
+    // New function: Detect enforcement popup and push behind by setting negative z-index
+    function pushEnforcementPopupBehind() {
+        // Select the enforcement popup by role and aria attributes (update selector if needed)
+        const enforcementPopup = document.querySelector('tp-yt-paper-dialog[aria-modal="true"]');
+
+        if (enforcementPopup) {
+            // Only change if z-index is positive (like 2204)
+            const currentZ = window.getComputedStyle(enforcementPopup).zIndex;
+            if (currentZ && Number(currentZ) > 0) {
+                enforcementPopup.style.zIndex = '-2204';
+                log(`Enforcement popup z-index changed from ${currentZ} to ${enforcementPopup.style.zIndex}`);
+            }
+        }
     }
 
     function popupRemover() {
@@ -70,6 +85,9 @@
 
                 log("Popup removed");
             }
+
+            // Check and push enforcement popup behind other elements by changing z-index
+            pushEnforcementPopupBehind();
 
             // If video is paused for some reason, play it
             if (video && video.paused) video.play();

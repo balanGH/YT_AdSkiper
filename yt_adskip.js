@@ -80,8 +80,10 @@
                 popup.remove();
 
                 // Try to resume video playback after removing popup
-                video.play();
-                setTimeout(() => video.play(), 500);
+                if (video) {
+                    video.play();
+                    setTimeout(() => video.play(), 500);
+                }
 
                 log("Popup removed");
             }
@@ -137,11 +139,10 @@
                 log("Found Ad");
 
                 const skipButtons = [
-                    'ytp-ad-skip-button-container',
-                    'ytp-ad-skip-button-modern',
+                    '.ytp-ad-skip-button-container',
+                    '.ytp-ad-skip-button-modern',
                     '.videoAdUiSkipButton',
                     '.ytp-ad-skip-button',
-                    '.ytp-ad-skip-button-modern',
                     '.ytp-ad-skip-button-slot'
                 ];
 
@@ -156,7 +157,12 @@
 
                     video.play();
                     let randomNumber = Math.random() * (0.5 - 0.1) + 0.1;
-                    video.currentTime = video.duration + randomNumber || 0;
+                    // Jump to the end of the ad to skip it. Guard against NaN duration
+                    // (duration is NaN until metadata loads) and avoid the operator
+                    // precedence trap of `duration + randomNumber || 0`.
+                    if (isFinite(video.duration)) {
+                        video.currentTime = video.duration + randomNumber;
+                    }
                 }
 
                 log("skipped Ad (✔️)");
@@ -184,9 +190,14 @@
 
     function removePageAds() {
         const sponsor = document.querySelectorAll("div#player-ads.style-scope.ytd-watch-flexy, div#panels.style-scope.ytd-watch-flexy");
-        const style = document.createElement('style');
 
-        style.textContent = `
+        // Only inject the ad-hiding stylesheet once. removePageAds() runs on every
+        // URL change, so without this guard the <head> accumulates duplicate <style> tags.
+        if (!document.getElementById('yt-adskip-style')) {
+            const style = document.createElement('style');
+            style.id = 'yt-adskip-style';
+
+            style.textContent = `
             ytd-action-companion-ad-renderer,
             ytd-display-ad-renderer,
             ytd-video-masthead-ad-advertiser-info-renderer,
@@ -214,12 +225,13 @@
             }
         `;
 
-        document.head.appendChild(style);
+            document.head.appendChild(style);
+        }
 
         sponsor?.forEach(element => {
             if (element.getAttribute("id") === "rendering-content") {
                 element.childNodes?.forEach(childElement => {
-                    if (childElement?.data.targetId && childElement?.data.targetId !== "engagement-panel-macro-markers-description-chapters") {
+                    if (childElement?.data?.targetId && childElement.data.targetId !== "engagement-panel-macro-markers-description-chapters") {
                         element.style.display = 'none';
                     }
                 });
